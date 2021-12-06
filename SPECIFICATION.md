@@ -1,6 +1,6 @@
 # Specification
 
-The Element protocol contains the following top-level contracts:
+The Lockless protocol contains the following top-level contracts:
 
 ## Wrapped Position
 
