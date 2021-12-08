@@ -246,6 +246,12 @@ contract YVaultAssetProxy is WrappedPosition {
         return vault.pricePerShare();
     }
 
+    /// @notice Get the price per position token in internal shares - position tokens pool
+    /// @return The price per share in units of share;
+    function pricePerPosition() external view override returns (uint256) {
+        return 10**decimals;
+    }
+
     /// @notice Function to reset approvals for the proxy
     function approve() external {
         token.approve(address(vault), 0);

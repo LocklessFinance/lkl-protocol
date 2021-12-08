@@ -14,6 +14,8 @@ interface IWrappedPosition is IERC20Permit {
         view
         returns (uint256);
 
+    function pricePerPosition() external view returns (uint256);
+
     function deposit(address sender, uint256 amount) external returns (uint256);
 
     function withdraw(

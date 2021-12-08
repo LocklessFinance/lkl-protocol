@@ -5,11 +5,11 @@ import "./interfaces/IERC20.sol";
 import "./interfaces/IWETH.sol";
 import "./interfaces/IWrappedPosition.sol";
 
-import "./libraries/ERC20Permit.sol";
+import "./libraries/ERC20PermitWithSupply.sol";
 
 /// @author Element Finance
 /// @title Wrapped Position Core
-abstract contract WrappedPosition is ERC20Permit, IWrappedPosition {
+abstract contract WrappedPosition is ERC20PermitWithSupply, IWrappedPosition {
     IERC20 public immutable override token;
 
     /// @notice Constructs this contract
@@ -53,6 +53,7 @@ abstract contract WrappedPosition is ERC20Permit, IWrappedPosition {
     function balanceOfUnderlying(address _who)
         external
         view
+        virtual
         override
         returns (uint256)
     {
@@ -79,6 +80,7 @@ abstract contract WrappedPosition is ERC20Permit, IWrappedPosition {
     /// @return Returns the number of Wrapped Position tokens minted
     function deposit(address _destination, uint256 _amount)
         external
+        virtual
         override
         returns (uint256)
     {
@@ -100,6 +102,7 @@ abstract contract WrappedPosition is ERC20Permit, IWrappedPosition {
     //                 as the call to this method or you risk loss of funds
     function prefundedDeposit(address _destination)
         external
+        virtual
         override
         returns (
             uint256,
@@ -126,7 +129,7 @@ abstract contract WrappedPosition is ERC20Permit, IWrappedPosition {
         address _destination,
         uint256 _shares,
         uint256 _minUnderlying
-    ) public override returns (uint256) {
+    ) public override virtual returns (uint256) {
         return _positionWithdraw(_destination, _shares, _minUnderlying, 0);
     }
 
@@ -140,7 +143,7 @@ abstract contract WrappedPosition is ERC20Permit, IWrappedPosition {
         address _destination,
         uint256 _amount,
         uint256 _minUnderlying
-    ) external override returns (uint256, uint256) {
+    ) external virtual override returns (uint256, uint256) {
         // First we load the number of underlying per unit of Wrapped Position token
         uint256 oneUnit = 10**decimals;
         uint256 underlyingPerShare = _underlying(oneUnit);
@@ -168,7 +171,7 @@ abstract contract WrappedPosition is ERC20Permit, IWrappedPosition {
         uint256 _shares,
         uint256 _minUnderlying,
         uint256 _underlyingPerShare
-    ) internal returns (uint256) {
+    ) internal virtual returns (uint256) {
         // Burn users shares
         _burn(msg.sender, _shares);
 
