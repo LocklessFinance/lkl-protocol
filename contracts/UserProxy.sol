@@ -178,6 +178,7 @@ contract UserProxy is Authorizable {
 
         uint256 wethReceivedPt = 0;
         uint256 wethReceivedYt = 0;
+        uint256 rewards = 0;
         // Check if we need to withdraw principal token
         if (_amountPT != 0) {
             // If we have to withdraw PT first transfer it to this contract
@@ -195,7 +196,7 @@ contract UserProxy is Authorizable {
             // Transfer the YT to this contract
             yieldToken.transferFrom(msg.sender, address(this), _amountYT);
             // Withdraw that YT
-            wethReceivedYt = derivedTranche.withdrawInterest(
+            (wethReceivedYt, rewards) = derivedTranche.withdrawInterest(
                 _amountYT,
                 address(this)
             );
@@ -209,9 +210,9 @@ contract UserProxy is Authorizable {
             require((wethReceivedYt != 0), "No yield accrued");
         }
         // Withdraw the ether from weth
-        weth.withdraw(wethReceivedPt + wethReceivedYt);
+        weth.withdraw(wethReceivedPt + wethReceivedYt + rewards);
         // Send the withdrawn eth to the caller
-        payable(msg.sender).transfer(wethReceivedPt + wethReceivedYt);
+        payable(msg.sender).transfer(wethReceivedPt + wethReceivedYt + rewards);
     }
 
     /// @dev The receive function allows WETH and only WETH to send

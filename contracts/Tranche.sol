@@ -166,6 +166,10 @@ contract Tranche is ERC20Permit, ITranche {
 
         // Load price per position tokens before
         uint256 sharePriceBefore = position.pricePerPosition();
+        // Remove accured rewards before if this is the first deposit
+        if (position.balanceOf(address(this)) == 0) {
+            position.removeAccuredRewards(address(this));
+        }
         // Since the wrapped position contract holds a balance we use the prefunded deposit method
         (
             uint256 shares,
@@ -176,13 +180,14 @@ contract Tranche is ERC20Permit, ITranche {
         // is the balanceBefore * sharePerPosition * underlyingPershare since (usedUnderlying/shares)
         // is underlying per share and balanceBefore is the balance of this contract in position
         // tokens before this deposit.
-        uint256 holdingsBaseAsset =
-            balanceBefore * sharePriceBefore * usedUnderlying /
-            (10 ** _underlyingDecimals) / shares;
-        // TODO: add incentives calculation
-        uint256 holdingsIncentives = 0;
+        uint256 holdingsBaseAsset = balanceBefore * sharePriceBefore *
+            usedUnderlying / (10 ** _underlyingDecimals) / shares;
+        // Get incentive rewards in underlying
+        uint256 holdingsIncentive = position.getRewardsInUnderlying(
+            address(this)
+        );
         // Total value held by this contract should be base asset value plus incentive rewards
-        uint256 holdingsValue = holdingsBaseAsset + holdingsIncentives;
+        uint256 holdingsValue = holdingsBaseAsset + holdingsIncentive;
         // This formula is inputUnderlying - inputUnderlying*interestPerUnderlying
         // Accumulated interest has its value in the interest tokens so we have to mint less
         // principal tokens to account for that.
@@ -340,14 +345,17 @@ contract Tranche is ERC20Permit, ITranche {
     function withdrawInterest(uint256 _amount, address _destination)
         external
         override
-        returns (uint256)
+        returns (uint256, uint256)
     {
         require(block.timestamp >= unlockTimestamp, "E:Not Expired");
         // Burn tokens from the sender
         interestToken.burn(msg.sender, _amount);
-        // Load the total value in underlying of this contract
-        // TODO: add incentives calculation and withdrawal
+        // Load the base assets of this contract
         uint256 underlyingValueLocked = position.balanceOfUnderlying(
+            address(this)
+        );
+        // Load the rewards of this contract
+        uint256 incentiveAmount = position.getIncentiveRewards(
             address(this)
         );
         // Load a stack variable to avoid future sloads
@@ -364,14 +372,21 @@ contract Tranche is ERC20Permit, ITranche {
         uint256 minRedemption = redemptionAmount -
             (redemptionAmount * _SLIPPAGE_BP) /
             1e18;
+        // The reward amount is the rewards per token times the amount
+        uint256 rewardAmount = (incentiveAmount * _amount) / _interestSupply;
         // Store that we reduced the supply
         interestSupply = uint128(_interestSupply - _amount);
         // Redeem position tokens for underlying
-        (uint256 redemption, ) = position.withdrawUnderlying(
+        (uint256 redemptionBase, ) = position.withdrawUnderlying(
             _destination,
             redemptionAmount,
             minRedemption
         );
-        return (redemption);
+        // Withdraw reward tokens
+        uint256 redemptionReward = position.withdrawRewards(
+            rewardAmount,
+            _destination
+        );
+        return (redemptionBase, redemptionReward);
     }
 }

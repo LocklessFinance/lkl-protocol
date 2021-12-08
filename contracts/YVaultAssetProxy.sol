@@ -252,6 +252,40 @@ contract YVaultAssetProxy is WrappedPosition {
         return 10**decimals;
     }
 
+    function withdrawRewards(uint256, address)
+        external
+        pure
+        override
+        returns (uint256)
+    {
+        return 0;
+    }
+
+    function getIncentiveRewards(address)
+        external
+        pure
+        override
+        returns (uint256)
+    {
+        return 0;
+    }
+
+    function getRewardsInUnderlying(address)
+        external
+        pure
+        override
+        returns (uint256)
+    {
+        return 0;
+    }
+
+    function removeAccuredRewards(address)
+        external
+        pure
+    {
+        return;
+    }
+
     /// @notice Function to reset approvals for the proxy
     function approve() external {
         token.approve(address(vault), 0);

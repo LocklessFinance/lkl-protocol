@@ -37,4 +37,12 @@ interface IWrappedPosition is IERC20Permit {
             uint256,
             uint256
         );
+
+    function getIncentiveRewards(address who) external view returns (uint256);
+
+    function getRewardsInUnderlying(address who) external view returns (uint256);
+
+    function withdrawRewards(uint256 amount, address to) external returns (uint256);
+
+    function removeAccuredRewards(address who) external;
 }

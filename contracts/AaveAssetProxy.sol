@@ -22,6 +22,8 @@ contract AaveAssetProxy is WrappedPosition {
     // Chainlink price feed contracts
     AggregatorV3Interface public immutable underlyingFeed;
     AggregatorV3Interface public immutable incentiveFeed;
+    // Record accured rewards before tranches join in
+    mapping(address => uint256) public removedRewards;
 
     /// @notice Constructs this contract and stores needed data
     /// @param _pool The aave lendingPool
@@ -106,7 +108,7 @@ contract AaveAssetProxy is WrappedPosition {
 
     /// @notice Get the price per position in the contract
     /// @return The price per position in units of share
-    function pricePerPosition() external view override returns (uint256) {
+    function pricePerPosition() public view override returns (uint256) {
         // Calculate one uint of position
         uint256 oneUnit = 10**decimals;
         // Load the Wrapped Position token total supply and shares reserve of the contract
@@ -141,35 +143,9 @@ contract AaveAssetProxy is WrappedPosition {
         override
         returns (uint256)
     {
-        uint256 sharesBalance = _positionConverter(balanceOf[_who], true);
+        uint256 sharesBalance = balanceOf[_who] * pricePerPosition() /
+            (10 ** decimals);
         return sharesBalance;
-    }
-
-    /// @notice Converts an input of Wrapped Position tokens to it's output of shares or an input
-    ///      of shares to an output of underlying, using ratio between position supply and
-    ///      shares balance of contract
-    /// @param amount the amount of input, Wrapped Position token if 'positionIn == true' shares if not
-    /// @param positionIn true to convert from Wrapped Position tokens to shares, false to convert from
-    ///                 shares to Wrapped Position tokens
-    /// @return The converted output of either aave shares or Wrapped Position tokens
-    function _positionConverter(uint256 amount, bool positionIn)
-        internal
-        view
-        virtual
-        returns (uint256)
-    {
-        // Load the Wrapped Position token total supply and shares reserve
-        uint256 positionSupply = totalSupply;
-        uint256 sharesReserve = aToken.balanceOf(address(this));
-        // If we are converted positions to shares
-        if (positionIn) {
-            // then we get the fraction of position supply this is and multiply by position amount
-            return (sharesReserve * amount) / positionSupply;
-        } else {
-            // otherwise we figure out the faction of shares this is and see how
-            // many Wrapped Position tokens we get out.
-            return (positionSupply * amount) / sharesReserve;
-        }
     }
 
     /// @notice Entry point to deposit tokens into the Wrapped Position contract
@@ -185,23 +161,21 @@ contract AaveAssetProxy is WrappedPosition {
     {
         // Send tokens to the proxy
         token.transferFrom(msg.sender, address(this), _amount);
+        // Get share price from our internal pool before deposit
+        uint256 sharePrice = pricePerPosition();
         // Calls our internal deposit function
         (uint256 shares, ) = _deposit();
-        // Calculate the Wrapped Position token to be minted to tranche, split on
-        // if this is the initialization case
-        uint256 mintAmount = totalSupply == 0
-            ? shares
-            : _positionConverter(shares, false);
-
+        // Calculate the Wrapped Position token to be minted to tranche
+        uint256 mintAmount = shares * (10 ** decimals) / sharePrice;
         // Mint them internal ERC20 tokens corresponding to the deposit
         _mint(_destination, mintAmount);
-        return shares;
+        return mintAmount;
     }
 
     /// @notice Entry point to deposit tokens into the Wrapped Position contract
     ///         Assumes the tokens were transferred before this was called
     /// @param _destination the destination of this deposit
-    /// @return Returns (WP tokens minted, used underlying,
+    /// @return Returns (Shares received, used underlying,
     ///                  senders WP balance before mint)
     /// @dev WARNING - The call which funds this method MUST be in the same transaction
     //                 as the call to this method or you risk loss of funds
@@ -214,16 +188,15 @@ contract AaveAssetProxy is WrappedPosition {
             uint256
         )
     {
+        // Get share price from our internal pool before deposit
+        uint256 sharePrice = pricePerPosition();
         // Calls our internal deposit function
         (uint256 shares, uint256 usedUnderlying) = _deposit();
         // Load the position balance
         uint256 balanceBefore = balanceOf[_destination];
 
-        // Calculate the Wrapped Position token to mint to tranche, split on
-        // if this is the initialization case
-        uint256 mintAmount = totalSupply == 0
-            ? shares
-            : _positionConverter(shares, false);
+        // Calculate the Wrapped Position token to mint to tranche
+        uint256 mintAmount = shares * (10 ** decimals) / sharePrice;
 
         // Mint them internal ERC20 tokens corresponding to the deposit
         _mint(_destination, mintAmount);
@@ -265,7 +238,8 @@ contract AaveAssetProxy is WrappedPosition {
         uint256 _underlyingPerShare
     ) internal override returns (uint256) {
         // Calculate Wrapped Position tokens amount to burn
-        uint256 positionAmount = _positionConverter(_shares, false);
+        uint256 positionAmount = _shares * (10 ** decimals) /
+            pricePerPosition();
         // Burn users Wrapped Position tokens
         _burn(msg.sender, positionAmount);
 
@@ -282,7 +256,70 @@ contract AaveAssetProxy is WrappedPosition {
         return withdrawAmount;
     }
 
-    /// @notice Get underlying price per incetive in units of underlying
+    function removeAccuredRewards(address who)
+        external
+        override
+    {
+        address[] memory assets = new address[](1);
+        assets[0] = address(aToken);
+        uint256 accuredRewards = IncentivesController.getRewardsBalance(
+            assets,
+            address(this)
+        );
+        removedRewards[who] = accuredRewards;
+    }
+
+    function withdrawRewards(uint256 amount, address to)
+        external
+        override
+        returns (uint256)
+    {
+        address[] memory assets = new address[](1);
+        assets[0] = address(aToken);
+        uint256 incentiveReceived = IncentivesController.claimRewards(
+            assets,
+            amount,
+            to
+        );
+        return incentiveReceived;
+    }
+
+    function getIncentiveRewards(address who)
+        public
+        view
+        override
+        returns (uint256)
+    {
+        address[] memory assets = new address[](1);
+        assets[0] = address(aToken);
+        // First we get total incentive amount of this contract
+        uint256 incentiveAmount = IncentivesController.getRewardsBalance(
+            assets,
+            address(this)
+        );
+        // Then we remove rewards before this tranche join in
+        incentiveAmount = incentiveAmount - removedRewards[who];
+        // Last we calculate the fraction of this tranche
+        incentiveAmount = totalSupply == 0
+            ? 0
+            : (incentiveAmount * balanceOf[who]) / totalSupply;
+        return incentiveAmount;
+    }
+
+    function getRewardsInUnderlying(address who)
+        external
+        view
+        override
+        returns (uint256)
+    {
+        uint256 incentiveAmount = getIncentiveRewards(who);
+        // Last we convert rewards to underlying
+        uint256 rewardsInUnderlying = (incentiveAmount * _getDerivedPrice()) /
+            (10**underlyingDecimals);
+        return rewardsInUnderlying;
+    }
+
+    /// @notice Get underlying price per incentive in units of underlying
     function _getDerivedPrice() internal view returns (uint256) {
         int256 decimals = int256(10**uint256(underlyingDecimals));
         (, int256 underlyingPrice, , , ) = underlyingFeed.latestRoundData();
