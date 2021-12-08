@@ -3,13 +3,14 @@
 // Using this code with any later version can be unsafe.
 pragma solidity ^0.8.0;
 
+import "./interfaces/AggregatorV3Interface.sol";
 import "./interfaces/IERC20.sol";
 import "./interfaces/ILendingPool.sol";
 import "./interfaces/IAaveIncentivesController.sol";
 import "./WrappedPosition.sol";
 
-/// @author Element Finance
-/// @title Yearn Vault v1 Asset Proxy
+/// @author Lockless Finance
+/// @title Aave asset proxy
 contract AaveAssetProxy is WrappedPosition {
     uint8 public immutable underlyingDecimals;
     // The aave lendingPool contract
@@ -18,17 +19,25 @@ contract AaveAssetProxy is WrappedPosition {
     IAaveIncentivesController public immutable IncentivesController;
     // Constant aave token address
     IERC20 public immutable aToken;
+    // Chainlink price feed contracts
+    AggregatorV3Interface public immutable underlyingFeed;
+    AggregatorV3Interface public immutable incentiveFeed;
 
     /// @notice Constructs this contract and stores needed data
     /// @param _pool The aave lendingPool
+    /// @param _incentivesController The aave IncentivesController
+    /// @param _underlyingFeed The chainlink underlying price feed address
+    /// @param _incentiveFeed The chainlink incentive token price feed address
     /// @param _token The underlying token.
     ///               This token should revert in the event of a transfer failure.
-    /// @param _incentivesController The aave IncentivesController
+    /// @param _aToken The aave share token
     /// @param _name The name of the token created
     /// @param _symbol The symbol of the token created
     constructor(
         address _pool,
         address _incentivesController,
+        address _underlyingFeed,
+        address _incentiveFeed,
         IERC20 _token,
         IERC20 _aToken,
         string memory _name,
@@ -36,6 +45,8 @@ contract AaveAssetProxy is WrappedPosition {
     ) WrappedPosition(_token, _name, _symbol) {
         pool = ILendingPool(_pool);
         IncentivesController = IAaveIncentivesController(_incentivesController);
+        underlyingFeed = AggregatorV3Interface(_underlyingFeed);
+        incentiveFeed = AggregatorV3Interface(_incentiveFeed);
         // Set approval for the proxy
         _token.approve(_pool, type(uint256).max);
         aToken = _aToken;
@@ -269,5 +280,40 @@ contract AaveAssetProxy is WrappedPosition {
         // This security feature is useful in some edge cases
         require(withdrawAmount >= _minUnderlying, "Not enough underlying");
         return withdrawAmount;
+    }
+
+    /// @notice Get underlying price per incetive in units of underlying
+    function _getDerivedPrice() internal view returns (uint256) {
+        int256 decimals = int256(10**uint256(underlyingDecimals));
+        (, int256 underlyingPrice, , , ) = underlyingFeed.latestRoundData();
+        uint8 underlyingPriceDecimals = underlyingFeed.decimals();
+        underlyingPrice = _scalePrice(
+            underlyingPrice,
+            underlyingPriceDecimals,
+            underlyingDecimals
+        );
+
+        (, int256 incentivePrice, , , ) = incentiveFeed.latestRoundData();
+        uint8 incentivePriceDecimals = underlyingFeed.decimals();
+        incentivePrice = _scalePrice(
+            incentivePrice,
+            incentivePriceDecimals,
+            underlyingDecimals
+        );
+
+        return uint256((underlyingPrice * decimals) / incentivePrice);
+    }
+
+    function _scalePrice(
+        int256 _price,
+        uint8 _priceDecimals,
+        uint8 _decimals
+    ) internal pure returns (int256) {
+        if (_priceDecimals < _decimals) {
+            return _price * int256(10**uint256(_decimals - _priceDecimals));
+        } else if (_priceDecimals > _decimals) {
+            return _price / int256(10**uint256(_priceDecimals - _decimals));
+        }
+        return _price;
     }
 }
