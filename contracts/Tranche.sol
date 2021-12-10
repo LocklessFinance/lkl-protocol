@@ -16,6 +16,7 @@ contract Tranche is ERC20Permit, ITranche {
     IInterestToken public immutable override interestToken;
     IWrappedPosition public immutable position;
     IERC20 public immutable underlying;
+    IERC20 public immutable incentiveToken;
     uint8 internal immutable _underlyingDecimals;
 
     // The outstanding amount of underlying which
@@ -33,6 +34,8 @@ contract Tranche is ERC20Permit, ITranche {
     // it is triggered in order to (1) prevent atomic flash loan price manipulation (2)
     // give 48 hours to remediate any other loss scenario before allowing withdraws
     uint256 public speedbump;
+    // Incentive reward amount
+    uint256 public incentiveRewards;
     // Const which is 48 hours in seconds
     uint256 internal constant _FORTY_EIGHT_HOURS = 172800;
     // An event to listen for when negative interest withdraw are triggered
@@ -47,12 +50,14 @@ contract Tranche is ERC20Permit, ITranche {
             uint256 expiration,
             IInterestToken interestTokenTemp,
             // solhint-disable-next-line
-            address unused
+            address unused,
+            address incentiveTokenAddress
         ) = trancheFactory.getData();
         interestToken = interestTokenTemp;
 
         IWrappedPosition wpContract = IWrappedPosition(wpAddress);
         position = wpContract;
+        incentiveToken = IERC20(incentiveTokenAddress);
 
         // Store the immutable time variables
         unlockTimestamp = expiration;
@@ -76,7 +81,8 @@ contract Tranche is ERC20Permit, ITranche {
             uint256 expiration,
             // solhint-disable-next-line
             IInterestToken unused,
-            address dateLib
+            address dateLib,
+
         ) = trancheFactory.getData();
 
         string memory strategySymbol = IWrappedPosition(wpAddress).symbol();
@@ -272,9 +278,20 @@ contract Tranche is ERC20Permit, ITranche {
         uint256 minOutput = withdrawAmount -
             (withdrawAmount * _SLIPPAGE_BP) /
             1e18;
-        // We make the actual withdraw from the position.
-        (uint256 actualWithdraw, uint256 sharesBurned) = position
-            .withdrawUnderlying(_destination, withdrawAmount, minOutput);
+        // We make the actual withdraw from the position. For the first withdrawal we record the total
+        // incentive amount received
+        (
+            uint256 actualWithdraw,
+            uint256 sharesBurned,
+            uint256 rewardAmount
+        ) = position.withdrawUnderlying(
+                _destination,
+                withdrawAmount,
+                minOutput
+            );
+        if (rewardAmount != 0) {
+            incentiveRewards = rewardAmount;
+        }
 
         // At this point we check that the implied contract holdings before this withdraw occurred
         // are more than enough to redeem all of the principal tokens for underlying ie that no
@@ -326,7 +343,7 @@ contract Tranche is ERC20Permit, ITranche {
     function withdrawInterest(uint256 _amount, address _destination)
         external
         override
-        returns (uint256)
+        returns (uint256, uint256)
     {
         require(block.timestamp >= unlockTimestamp, "E:Not Expired");
         // Burn tokens from the sender
@@ -352,11 +369,14 @@ contract Tranche is ERC20Permit, ITranche {
         // Store that we reduced the supply
         interestSupply = uint128(_interestSupply - _amount);
         // Redeem position tokens for underlying
-        (uint256 redemption, ) = position.withdrawUnderlying(
-            _destination,
-            redemptionAmount,
-            minRedemption
-        );
-        return (redemption);
+        (uint256 redemption, , uint256 rewardAmount) = position
+            .withdrawUnderlying(_destination, redemptionAmount, minRedemption);
+        if (rewardAmount != 0) {
+            incentiveRewards = rewardAmount;
+        }
+        uint256 redemptionRewards;
+        // TODO: Since total rewards have been sent to this contract, we do a allocation
+        // here and transfer the fraction to user depending on input yToken amount
+        return (redemption, redemptionRewards);
     }
 }
