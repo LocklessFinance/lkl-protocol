@@ -188,7 +188,7 @@ contract YVaultAssetProxy is WrappedPosition {
         uint256 _shares,
         address _destination,
         uint256 _underlyingPerShare
-    ) internal override returns (uint256) {
+    ) internal override returns (uint256, uint256) {
         // If we do not have it we load the price per share
         if (_underlyingPerShare == 0) {
             _underlyingPerShare = _pricePerShare();
@@ -205,7 +205,7 @@ contract YVaultAssetProxy is WrappedPosition {
             // 'token' is an immutable in WrappedPosition
             token.transfer(_destination, needed);
             // Short circuit and return
-            return (needed);
+            return (needed, 0);
         }
         // If we don't have enough local reserves we do the actual withdraw
         // Withdraws shares from the vault. Max loss is set at 100% as
@@ -225,7 +225,7 @@ contract YVaultAssetProxy is WrappedPosition {
         // Transfer the underlying to the destination 'token' is an immutable in WrappedPosition
         token.transfer(_destination, userShare);
         // Return the amount of underlying
-        return userShare;
+        return (userShare, 0);
     }
 
     /// @notice Get the underlying amount of tokens per shares given

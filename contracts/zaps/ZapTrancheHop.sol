@@ -78,7 +78,11 @@ contract ZapTrancheHop is Authorizable {
         if (_amountYt > 0) {
             IERC20 yt = IERC20(trancheFrom.interestToken());
             yt.transferFrom(msg.sender, address(this), _amountYt);
-            balance += trancheFrom.withdrawInterest(_amountYt, _positionTo);
+            (uint256 underlyingReceived, ) = trancheFrom.withdrawInterest(
+                _amountYt,
+                _positionTo
+            );
+            balance += underlyingReceived;
         }
 
         (uint256 ptMinted, uint256 ytMinted) = trancheTo.prefundedDeposit(

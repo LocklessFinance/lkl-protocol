@@ -26,14 +26,14 @@ contract TestWrappedPosition is WrappedPosition {
         uint256 amount,
         address destination,
         uint256
-    ) internal override returns (uint256) {
+    ) internal override returns (uint256, uint256) {
         // Send the requested amount converted to underlying
         TestERC20(address(token)).uncheckedTransfer(
             destination,
             amount * underlyingUnitValue
         );
         // Returns the amount of output transferred
-        return (amount * underlyingUnitValue);
+        return (amount * underlyingUnitValue, 0);
     }
 
     function setSharesToUnderlying(uint256 _value) external {

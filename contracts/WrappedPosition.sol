@@ -40,7 +40,7 @@ abstract contract WrappedPosition is ERC20Permit, IWrappedPosition {
         uint256,
         address,
         uint256
-    ) internal virtual returns (uint256);
+    ) internal virtual returns (uint256, uint256);
 
     /// @dev Converts between an internal balance representation
     ///      and underlying tokens.
@@ -126,8 +126,14 @@ abstract contract WrappedPosition is ERC20Permit, IWrappedPosition {
         address _destination,
         uint256 _shares,
         uint256 _minUnderlying
-    ) public override returns (uint256) {
-        return _positionWithdraw(_destination, _shares, _minUnderlying, 0);
+    ) public override returns (uint256, uint256) {
+        (uint256 underlyingReceived, uint256 rewardAmount) = _positionWithdraw(
+            _destination,
+            _shares,
+            _minUnderlying,
+            0
+        );
+        return (underlyingReceived, rewardAmount);
     }
 
     /// @notice This function burns enough tokens from the sender to send _amount
@@ -140,20 +146,20 @@ abstract contract WrappedPosition is ERC20Permit, IWrappedPosition {
         address _destination,
         uint256 _amount,
         uint256 _minUnderlying
-    ) external override returns (uint256, uint256) {
+    ) external override returns (uint256, uint256, uint256) {
         // First we load the number of underlying per unit of Wrapped Position token
         uint256 oneUnit = 10**decimals;
         uint256 underlyingPerShare = _underlying(oneUnit);
         // Then we calculate the number of shares we need
         uint256 shares = (_amount * oneUnit) / underlyingPerShare;
         // Using this we call the normal withdraw function
-        uint256 underlyingReceived = _positionWithdraw(
+        (uint256 underlyingReceived, uint256 rewardAmount) = _positionWithdraw(
             _destination,
             shares,
             _minUnderlying,
             underlyingPerShare
         );
-        return (underlyingReceived, shares);
+        return (underlyingReceived, shares, rewardAmount);
     }
 
     /// @notice This internal function allows the caller to provide a precomputed 'underlyingPerShare'
@@ -168,12 +174,12 @@ abstract contract WrappedPosition is ERC20Permit, IWrappedPosition {
         uint256 _shares,
         uint256 _minUnderlying,
         uint256 _underlyingPerShare
-    ) internal returns (uint256) {
+    ) internal returns (uint256, uint256) {
         // Burn users shares
         _burn(msg.sender, _shares);
 
         // Withdraw that many shares from the vault
-        uint256 withdrawAmount = _withdraw(
+        (uint256 withdrawAmount, uint256 rewardAmount) = _withdraw(
             _shares,
             _destination,
             _underlyingPerShare
@@ -182,6 +188,6 @@ abstract contract WrappedPosition is ERC20Permit, IWrappedPosition {
         // We revert if this call doesn't produce enough underlying
         // This security feature is useful in some edge cases
         require(withdrawAmount >= _minUnderlying, "Not enough underlying");
-        return withdrawAmount;
+        return (withdrawAmount, rewardAmount);
     }
 }

@@ -24,6 +24,7 @@ contract TrancheFactory {
     IInterestTokenFactory internal immutable _interestTokenFactory;
     address internal _tempWpAddress;
     uint256 internal _tempExpiration;
+    address internal _tempIncentiveToken;
     IInterestToken internal _tempInterestToken;
     bytes32 public constant TRANCHE_CREATION_HASH =
         keccak256(type(Tranche).creationCode);
@@ -41,12 +42,14 @@ contract TrancheFactory {
     /// @param _expiration The expiration timestamp for the tranche.
     /// @param _wpAddress Address of the Wrapped Position contract the tranche will use.
     /// @return The deployed Tranche contract.
-    function deployTranche(uint256 _expiration, address _wpAddress)
-        public
-        returns (Tranche)
-    {
+    function deployTranche(
+        uint256 _expiration,
+        address _wpAddress,
+        address _incentiveToken
+    ) public returns (Tranche) {
         _tempWpAddress = _wpAddress;
         _tempExpiration = _expiration;
+        _tempIncentiveToken = _incentiveToken;
 
         IWrappedPosition wpContract = IWrappedPosition(_wpAddress);
         bytes32 salt = keccak256(abi.encodePacked(_wpAddress, _expiration));
@@ -88,6 +91,7 @@ contract TrancheFactory {
         delete _tempWpAddress;
         delete _tempExpiration;
         delete _tempInterestToken;
+        delete _tempIncentiveToken;
 
         return tranche;
     }
@@ -105,6 +109,7 @@ contract TrancheFactory {
             address,
             uint256,
             IInterestToken,
+            address,
             address
         )
     {
@@ -112,7 +117,8 @@ contract TrancheFactory {
             _tempWpAddress,
             _tempExpiration,
             _tempInterestToken,
-            _dateLibrary
+            _dateLibrary,
+            _tempIncentiveToken
         );
     }
 }
