@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
-// WARNING: This has been validated for yearn vaults up to version 0.3.5.
-// Using this code with any later version can be unsafe.
+// WARNING: This has been validated for AaveIncentivesController revision 1
+//  and Aave lending pool revision 2.
+// Using this code with any other version can be unsafe.
 pragma solidity ^0.8.0;
 
 import "./interfaces/AggregatorV3Interface.sol";
@@ -58,6 +59,8 @@ contract AaveAssetProxy is WrappedPosition {
         // Set approval for the proxy
         _token.approve(_pool, type(uint256).max);
         aToken = _aToken;
+
+        // We use local because immutables are not readable in construction
         uint8 localUnderlyingDecimals = _aToken.decimals();
         underlyingDecimals = localUnderlyingDecimals;
         require(
@@ -69,17 +72,36 @@ contract AaveAssetProxy is WrappedPosition {
     /// @notice Makes the actual deposit into the aave lending pool
     /// @return Tuple (the shares minted, amount underlying used)
     function _deposit() internal override returns (uint256, uint256) {
-        /* 1. Load deposited underlying amount
-           2. Load toatal assets held by this contract including incentive rewards
-           3. Perform the actual deposit into aave and receive equal aTokens
-           4. Convert aToken amount to shares by following equation:
-                newShares / totalShares =  depositAmount / totalValue
-           5. Accumulate deposited underlying amount
-           6. Return share minted and underlying consumed
-           */
+        // Load the total value of this contract
+        uint256 holdings = aToken.balanceOf(address(this)) +
+            _getRewardsInUnderlying();
+        // Calculate shares amount per underlying
+        uint256 sharePerHolding = holdings == 0
+            ? (10**underlyingDecimals)
+            : (shareSupply * (10**underlyingDecimals)) / holdings;
+
+        // Load the underlying balance of contract and deposit them to aava
+        // We get aTokens as the same amount as underlying
+        uint256 amount = token.balanceOf(address(this));
+        pool.deposit(address(token), amount, address(this), 0);
+
+        // Calculate shares to mint
+        uint256 newShares = (amount * sharePerHolding) /
+            (10**underlyingDecimals);
+        // Increase deposited amount and share supply
+        depositedAmount += amount;
+        shareSupply += newShares;
+        // Accumulate incentive shares for msg.sender. Incentive rewards will be
+        // allocated depending on their incentiveBalance. Pay attention if msg.sender
+        // is not the same address with _destination
+        incentiveSupply += newShares;
+        incentiveBalance[msg.sender] += newShares;
+        // Return the amount of shares the user has produced, and the amount used for it.
+        return (newShares, amount);
     }
 
-    /// @notice Withdraw the number of shares
+    /// @notice Withdraw the number of shares, if it's the first withdrawal, we
+    /// claim all the incentive rewards
     /// @param _shares The number of shares to withdraw
     /// @param _destination The address to send the output funds
     // @param _underlyingPerShare The possibly precomputed underlying per share
@@ -88,13 +110,27 @@ contract AaveAssetProxy is WrappedPosition {
         address _destination,
         uint256
     ) internal override returns (uint256, uint256) {
-        /*  1. Convert share amount to aToken amount and deposited amount
-            2. Decrease deposited underlying amount and corresponding shares
-            3. Perform withdraw from aave
-            4. If it's the first withdrawal of this tranche, withdraw all rewards from
-                aave incentives controller
-            4. Return received underlying amount and reward amount
-            */
+        // Convert share amount to aToken amount and deposited amount
+        uint256 amount = _underlying(_shares);
+        uint256 underlyingAmount = (depositedAmount * _shares) / shareSupply;
+
+        // Decrease share supply and deposited amount
+        depositedAmount -= underlyingAmount;
+        shareSupply -= _shares;
+
+        // Perform the withdrawal and send underlying to destination directly
+        uint256 amountReceived = pool.withdraw(
+            address(token),
+            amount,
+            _destination
+        );
+
+        // We claim all the incentive rewards for the first withdrawal and send them
+        // to msg.sender
+        uint256 rewardAmount = _withdrawRewards();
+
+        // Return underlying received and rewards claimed
+        return (amountReceived, rewardAmount);
     }
 
     /// @notice We seprate share value into underlying and Matic incentives
@@ -110,25 +146,37 @@ contract AaveAssetProxy is WrappedPosition {
         return ((aToken.balanceOf(address(this)) * _amount) / shareSupply);
     }
 
-    function _withdrawRewards(uint256 amount, address to)
-        internal
-        returns (uint256)
-    {
+    /// @notice Withdraw tranches's total rewards
+    /// @return Rewards received
+    function _withdrawRewards() internal returns (uint256) {
+        uint256 _incentiveBalance = incentiveBalance[msg.sender];
+        if (_incentiveBalance == 0) {
+            return 0;
+        }
+
+        // Calculate rewards amount to withdraw
+        uint256 amount = (_getIncentiveRewards() * _incentiveBalance) /
+            incentiveSupply;
+        // Set related variables
+        incentiveSupply -= _incentiveBalance;
+        incentiveBalance[msg.sender] -= _incentiveBalance;
+
+        // Withdraw rewards from aave
         address[] memory assets = new address[](1);
         assets[0] = address(aToken);
         uint256 incentiveReceived = IncentivesController.claimRewards(
             assets,
             amount,
-            to
+            msg.sender
         );
         return incentiveReceived;
     }
 
-    // Get incentive rewards held by this contract
+    /// @notice Get incentive rewards held by this contract
+    /// @return WMatic amount held belong to this contract
     function _getIncentiveRewards() internal view returns (uint256) {
         address[] memory assets = new address[](1);
         assets[0] = address(aToken);
-        // First we get total incentive amount of this contract
         uint256 incentiveAmount = IncentivesController.getRewardsBalance(
             assets,
             address(this)
@@ -146,7 +194,7 @@ contract AaveAssetProxy is WrappedPosition {
         return rewardsInUnderlying;
     }
 
-    /// @notice Get underlying price per incentive in units of underlying
+    /// @notice Get underlying price per incentive in units of underlying from chainlink
     function _getDerivedPrice() internal view returns (uint256) {
         int256 decimals = int256(10**uint256(underlyingDecimals));
         (, int256 underlyingPrice, , , ) = underlyingFeed.latestRoundData();

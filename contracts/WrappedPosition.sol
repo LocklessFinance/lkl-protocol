@@ -146,15 +146,7 @@ abstract contract WrappedPosition is ERC20Permit, IWrappedPosition {
         address _destination,
         uint256 _amount,
         uint256 _minUnderlying
-    )
-        external
-        override
-        returns (
-            uint256,
-            uint256,
-            uint256
-        )
-    {
+    ) external override returns (uint256, uint256, uint256) {
         // First we load the number of underlying per unit of Wrapped Position token
         uint256 oneUnit = 10**decimals;
         uint256 underlyingPerShare = _underlying(oneUnit);

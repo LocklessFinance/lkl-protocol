@@ -278,8 +278,8 @@ contract Tranche is ERC20Permit, ITranche {
         uint256 minOutput = withdrawAmount -
             (withdrawAmount * _SLIPPAGE_BP) /
             1e18;
-        // We make the actual withdraw from the position. For the first withdrawal we record the total
-        // incentive amount received
+        // We make the actual withdraw from the position.For the first withdrawal we claim all the
+        // incentives to tranche for allocation
         (
             uint256 actualWithdraw,
             uint256 sharesBurned,
@@ -333,7 +333,7 @@ contract Tranche is ERC20Permit, ITranche {
     }
 
     /**
-    @notice Burn interest tokens to withdraw underlying tokens.
+    @notice Burn interest tokens to withdraw underlying tokens and incentive rewards
     @param _amount The number of interest tokens to burn.
     @param _destination The address to send the result to
     @return The number of underlying token released
@@ -368,15 +368,44 @@ contract Tranche is ERC20Permit, ITranche {
             1e18;
         // Store that we reduced the supply
         interestSupply = uint128(_interestSupply - _amount);
-        // Redeem position tokens for underlying
+        // Redeem position tokens for underlying.For the first withdrawal we claim
+        // all the incentives to tranche for allocation
         (uint256 redemption, , uint256 rewardAmount) = position
             .withdrawUnderlying(_destination, redemptionAmount, minRedemption);
         if (rewardAmount != 0) {
             incentiveRewards = rewardAmount;
         }
-        uint256 redemptionRewards;
-        // TODO: Since total rewards have been sent to this contract, we do a allocation
-        // here and transfer the fraction to user depending on input yToken amount
+
+        uint256 redemptionRewards = _withdrawRewards(
+            _amount,
+            _interestSupply,
+            _destination
+        );
+        // Return underlying and rewards redeemed
         return (redemption, redemptionRewards);
+    }
+
+    /**
+    @notice Since total rewards have been sent to this contract, we do a allocation
+        here and transfer the fraction to user depending on input yToken amount
+    @param _amount The number of interest tokens to withdraw.
+    @param _interestSupply The interest supply before this withdrawal
+    @param _to The address to send the result to
+    @return The number of incentives released
+     */
+    function _withdrawRewards(
+        uint256 _amount,
+        uint256 _interestSupply,
+        address _to
+    ) internal returns (uint256) {
+        if (incentiveRewards == 0) {
+            return 0;
+        }
+
+        // Calculate the fraction of rewards balance to withdraw
+        uint256 rewardsAmount = (_amount * incentiveRewards) / _interestSupply;
+        incentiveToken.transfer(_to, rewardsAmount);
+        // Return claimed amount
+        return rewardsAmount;
     }
 }

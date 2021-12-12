@@ -92,6 +92,7 @@ contract TrancheFactory {
         delete _tempExpiration;
         delete _tempInterestToken;
         delete _tempIncentiveToken;
+
         return tranche;
     }
 
