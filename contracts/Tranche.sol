@@ -6,13 +6,14 @@ import "./interfaces/IWrappedPosition.sol";
 import "./interfaces/ITranche.sol";
 import "./interfaces/ITrancheFactory.sol";
 import "./interfaces/IInterestToken.sol";
+import "./interfaces/ILKLStaking.sol";
 
-import "./libraries/ERC20Permit.sol";
+import "./libraries/ERC20PermitWithMining.sol";
 import "./libraries/DateString.sol";
 
 /// @author Element Finance
 /// @title Tranche
-contract Tranche is ERC20Permit, ITranche {
+contract Tranche is ERC20PermitWithMining, ITranche {
     IInterestToken public immutable override interestToken;
     IWrappedPosition public immutable position;
     IERC20 public immutable underlying;
@@ -42,7 +43,7 @@ contract Tranche is ERC20Permit, ITranche {
     event SpeedBumpHit(uint256 timestamp);
 
     /// @notice Constructs this contract
-    constructor() ERC20Permit("Element Principal Token ", "eP") {
+    constructor() ERC20Permit("Element Principal Token", "eP") {
         // Assume the caller is the Tranche factory.
         ITrancheFactory trancheFactory = ITrancheFactory(msg.sender);
         (
@@ -51,7 +52,9 @@ contract Tranche is ERC20Permit, ITranche {
             IInterestToken interestTokenTemp,
             // solhint-disable-next-line
             address unused,
-            address incentiveTokenAddress
+            address incentiveTokenAddress,
+            address miningAddress,
+            uint256 _pid
         ) = trancheFactory.getData();
         interestToken = interestTokenTemp;
 
@@ -69,6 +72,9 @@ contract Tranche is ERC20Permit, ITranche {
         _underlyingDecimals = localUnderlyingDecimals;
         // And set this contract to have the same
         _setupDecimals(localUnderlyingDecimals);
+
+        lklStaking = ILKLStaking(miningAddress);
+        pid = _pid;
     }
 
     /// @notice We override the optional extra construction function from ERC20 to change names
@@ -82,6 +88,8 @@ contract Tranche is ERC20Permit, ITranche {
             // solhint-disable-next-line
             IInterestToken unused,
             address dateLib,
+            ,
+            ,
 
         ) = trancheFactory.getData();
 

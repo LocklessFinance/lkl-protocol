@@ -12,6 +12,8 @@ interface ITrancheFactory {
             uint256,
             InterestToken,
             address,
-            address
+            address,
+            address,
+            uint256
         );
 }
