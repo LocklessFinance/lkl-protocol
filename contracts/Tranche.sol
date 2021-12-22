@@ -404,6 +404,7 @@ contract Tranche is ERC20Permit, ITranche {
 
         // Calculate the fraction of rewards balance to withdraw
         uint256 rewardsAmount = (_amount * incentiveRewards) / _interestSupply;
+        incentiveRewards -= rewardsAmount;
         incentiveToken.transfer(_to, rewardsAmount);
         // Return claimed amount
         return rewardsAmount;
