@@ -5,6 +5,7 @@ import "../interfaces/IWrappedPosition.sol";
 import "../interfaces/IERC20.sol";
 import "../interfaces/IInterestTokenFactory.sol";
 import "../interfaces/IInterestToken.sol";
+import "../interfaces/ILKLStaking.sol";
 
 pragma solidity ^0.8.0;
 
@@ -25,6 +26,8 @@ contract TrancheFactory {
     address internal _tempWpAddress;
     uint256 internal _tempExpiration;
     address internal _tempIncentiveToken;
+    address internal _tempLKLStaking;
+    uint256 internal _tempPid;
     IInterestToken internal _tempInterestToken;
     bytes32 public constant TRANCHE_CREATION_HASH =
         keccak256(type(Tranche).creationCode);
@@ -45,11 +48,13 @@ contract TrancheFactory {
     function deployTranche(
         uint256 _expiration,
         address _wpAddress,
-        address _incentiveToken
+        address _incentiveToken,
+        address _lklStaking
     ) public returns (Tranche) {
         _tempWpAddress = _wpAddress;
         _tempExpiration = _expiration;
         _tempIncentiveToken = _incentiveToken;
+        _tempLKLStaking = _lklStaking;
 
         IWrappedPosition wpContract = IWrappedPosition(_wpAddress);
         bytes32 salt = keccak256(abi.encodePacked(_wpAddress, _expiration));
@@ -80,6 +85,14 @@ contract TrancheFactory {
             underlyingDecimals
         );
 
+        ILKLStaking(_lklStaking).add(
+            predictedAddress,
+            _expiration,
+            false,
+            true
+        );
+        _tempPid = ILKLStaking(_lklStaking).poolLength() - 1;
+
         Tranche tranche = new Tranche{ salt: salt }();
         emit TrancheCreated(address(tranche), _wpAddress, _expiration);
         require(
@@ -92,6 +105,8 @@ contract TrancheFactory {
         delete _tempExpiration;
         delete _tempInterestToken;
         delete _tempIncentiveToken;
+        delete _tempLKLStaking;
+        delete _tempPid;
 
         return tranche;
     }
@@ -110,7 +125,9 @@ contract TrancheFactory {
             uint256,
             IInterestToken,
             address,
-            address
+            address,
+            address,
+            uint256
         )
     {
         return (
@@ -118,7 +135,9 @@ contract TrancheFactory {
             _tempExpiration,
             _tempInterestToken,
             _dateLibrary,
-            _tempIncentiveToken
+            _tempIncentiveToken,
+            _tempLKLStaking,
+            _tempPid
         );
     }
 }
