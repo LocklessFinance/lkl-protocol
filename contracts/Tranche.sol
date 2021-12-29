@@ -42,7 +42,7 @@ contract Tranche is ERC20Permit, ITranche {
     event SpeedBumpHit(uint256 timestamp);
 
     /// @notice Constructs this contract
-    constructor() ERC20Permit("Element Principal Token ", "eP") {
+    constructor() ERC20Permit("Lockless Principal Token ", "p") {
         // Assume the caller is the Tranche factory.
         ITrancheFactory trancheFactory = ITrancheFactory(msg.sender);
         (
@@ -50,7 +50,7 @@ contract Tranche is ERC20Permit, ITranche {
             uint256 expiration,
             IInterestToken interestTokenTemp,
             // solhint-disable-next-line
-            address unused,
+            address dateLibUnused,
             address incentiveTokenAddress
         ) = trancheFactory.getData();
         interestToken = interestTokenTemp;
