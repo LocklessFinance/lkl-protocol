@@ -14,13 +14,13 @@ For a technical contract overview please read our [specification](https://github
 
 ## Bugs and Feature Requests
 
-The code in this repository's main branch is deployed to the Ethereum blockchain and cannot be changed. Despite that, the Element community is engaged in the active development of new features and code fixes which are an extension of this code. If you have a suggestion for a new feature, extension, or cool use case and want to help the community, drop by the dev channel in our [discord] to discuss and you will have a warm welcome!
+The code in this repository's main branch is deployed to the Ethereum blockchain and cannot be changed. Despite that, the Lockless community is engaged in the active development of new features and code fixes which are an extension of this code. If you have a suggestion for a new feature, extension, or cool use case and want to help the community, drop by the dev channel in our [discord] to discuss and you will have a warm welcome!
 
 For non-security-critical bugs, you can open a public issue on this repository, but please follow our issue guidelines. For any security-related critical bugs please report to contact@lockless.finance and follow responsible disclosure standards since these contracts are likely to hold high-value cryptocurrency. If you do find a bug there is a Bug Bounty program funded by Lockless Finance [here]. Additionally, the Lockless Finance Bug Bounty program has been extended to the [Immunefi platform].
 
 ## Integrations and Code Contributions
 
-Integrating with the Element protocol's tokens is as easy as adding ERC20 compliant tokens to your project or integrating with the public methods smart contract directly on the Ethereum blockchain. Launching new assets on Element is also permissionless but may require some new smart contract code; to write this code please carefully review the specification and don't hesitate to reach out and ask any questions in the dev channel of our [discord].
+Integrating with the Lockless protocol's tokens is as easy as adding ERC20 compliant tokens to your project or integrating with the public methods smart contract directly on the Ethereum blockchain. Launching new assets on Lockless is also permissionless but may require some new smart contract code; to write this code please carefully review the specification and don't hesitate to reach out and ask any questions in the dev channel of our [discord].
 
 We welcome new contributors and code contributions with open arms! Please be sure to follow our contribution [guidelines](https://github.com/LocklessFinance/lkl-protocol/blob/main/CONTRIBUTING.md) when proposing any new code. Lastly, because Lockless is a community driven protocol, any new code contributions are more likely to be accepted into future deployments of the protocol if they have been openly discussed within the community first.
 
