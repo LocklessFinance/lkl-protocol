@@ -1,4 +1,5 @@
 # Lockless Protocol
+Official solidity implementation of the Lockless Protocol, based off of the [official solidity implementation of the Element Protocol](https://github.com/element-fi/elf-contracts).
 
 [![Build Status](https://github.com/element-fi/elf-contracts/workflows/Tests/badge.svg)](https://github.com/element-fi/elf-contracts/actions)
 [![Coverage Status](https://coveralls.io/repos/github/element-fi/elf-contracts/badge.svg?branch=main&service=github&t=7FWsvc)](https://coveralls.io/github/element-fi/elf-contracts?branch=main)
@@ -53,11 +54,3 @@ npm run build
 ```
 npm run test
 ```
-
-## Contract Addresses
-
-Deployed contract addresses can be found in the [changelog site].
-
-> Note: The highest release version will always contain the latest list of contract addresses.
-
-Additionally, the latest deployed contract addresses for Goerli and Mainnet can be found [here] and [here] respectively.
