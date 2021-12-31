@@ -74,7 +74,7 @@ contract AaveAssetProxy is WrappedPosition {
     function _deposit() internal override returns (uint256, uint256) {
         // Load the total value of this contract
         uint256 holdings = aToken.balanceOf(address(this)) +
-            _getRewardsInUnderlying();
+            getRewardsInUnderlying();
         // Calculate shares amount per underlying
         uint256 sharePerHolding = holdings == 0
             ? (10**underlyingDecimals)
@@ -186,7 +186,7 @@ contract AaveAssetProxy is WrappedPosition {
 
     /// @notice We seprate share value into underlying and Matic incentives,
     /// and we get rewards value here
-    function _getRewardsInUnderlying() internal view returns (uint256) {
+    function getRewardsInUnderlying() public view returns (uint256) {
         uint256 incentiveAmount = _getIncentiveRewards();
         // Convert rewards to underlying
         uint256 rewardsInUnderlying = (incentiveAmount * _getDerivedPrice()) /
